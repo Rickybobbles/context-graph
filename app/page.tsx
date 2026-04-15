@@ -48,7 +48,7 @@ function clusterPositions(items: Item[], pageSp: number, groupGap: number) {
 }
 
 /* ── Border color per type ── */
-function borderColor(it: typeof ITEMS[0]) {
+function borderColor(it: Item) {
   if (it.t === 'information') return '#b0aca6'
   if (it.t === 'task') return '#5a7da6'
   if (it.t === 'insight') return '#a08530'
