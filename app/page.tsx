@@ -255,7 +255,7 @@ export default function ContextGraph() {
       <div className="flex flex-1 min-h-0">
         {/* Stack */}
         <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-          <div style={{ perspective: params['Perspective'], perspectiveOrigin: '58% 50%', width: 560, height: 560, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: `scale(${Math.min(0.85, 200 / (items.length * params['Page Spacing'] * 0.9)).toFixed(3)})` }}>
+          <div style={{ perspective: params['Perspective'], perspectiveOrigin: '58% 20%', width: 560, height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 48, transform: `scale(${Math.min(0.85, 280 / (items.length * params['Page Spacing'] * 0.9)).toFixed(3)})`, transformOrigin: 'center bottom' }}>
             <div style={{ position: 'relative', transformStyle: 'preserve-3d', transform: stackTransform, width: params['Page Width'], height: params['Page Height'], transition: 'transform 0.6s cubic-bezier(0.4,0,0.2,1)' }}>
               {items.map((it, i) => {
                 const z = isClustered ? clusterZ[i] : chronoZ[i]
