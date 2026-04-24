@@ -106,8 +106,8 @@ export default function ContextGraph() {
   }, [])
 
   const params = useDialKit('Stack Controls', {
-    'Page Spacing':       [6, 1, 10],
-    'Group Gap':          [26, 2, 40],
+    'Page Spacing':       [7.6, 1, 12],
+    'Group Gap':          [21, 2, 40],
     'Rotate X':           [64, 20, 80],
     'Rotate Z':           [-42, -60, -10],
     'Perspective':        [1400, 400, 3000],
@@ -124,10 +124,15 @@ export default function ContextGraph() {
     'Intro Page Gap':     [4.5, 1, 8],
   })
 
-  // Target ~300px of visual z-depth after rotation.
-  // Account for group gaps in clustered view (~5 gaps * groupGap).
+  const perMode = useDialKit('Per-Mode Overrides', {
+    'Stack Offset Y':     [0, -200, 200],
+    'Scene Padding Bottom': [80, 0, 200],
+    'Max Stack Height':   [400, 150, 600],
+  })
+
+  // Max stack height controlled per-mode via DialKit.
   const groupGapTotal = 5 * params['Group Gap']
-  const maxZ = 300 / 0.9 // visual target / sin(rotX)
+  const maxZ = perMode['Max Stack Height'] / 0.9
   const effectiveSp = Math.min(params['Page Spacing'], (maxZ - groupGapTotal) / items.length)
   const chronoZ = useMemo(() => chronoPositions(items, effectiveSp), [items, effectiveSp])
   const clusterZ = useMemo(() => clusterPositions(items, effectiveSp, params['Group Gap']), [items, effectiveSp, params['Group Gap']])
@@ -260,8 +265,8 @@ export default function ContextGraph() {
       <div className="flex flex-1 min-h-0">
         {/* Stack */}
         <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-          <div style={{ perspective: params['Perspective'], perspectiveOrigin: '58% 20%', width: 560, height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 24 }}>
-            <div style={{ position: 'relative', transformStyle: 'preserve-3d', transform: stackTransform, width: params['Page Width'], height: params['Page Height'], transition: 'transform 0.6s cubic-bezier(0.4,0,0.2,1)' }}>
+          <div style={{ perspective: params['Perspective'], perspectiveOrigin: '58% 20%', width: 560, height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: perMode['Scene Padding Bottom'] }}>
+            <div style={{ position: 'relative', transformStyle: 'preserve-3d', transform: `${stackTransform} translateY(${perMode['Stack Offset Y']}px)`, width: params['Page Width'], height: params['Page Height'], transition: 'transform 0.6s cubic-bezier(0.4,0,0.2,1)' }}>
               {items.map((it, i) => {
                 const z = isClustered ? clusterZ[i] : chronoZ[i]
                 const isActive = isClustered || it.s === current
