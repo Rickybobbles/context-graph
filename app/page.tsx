@@ -9,21 +9,34 @@ import {
   type Item, type ItemType, type Stage,
 } from './data'
 import { AM_ITEMS, AM_STAGES } from './data-am'
+import { BROKERAGE_ITEMS, BROKERAGE_STAGES } from './data-brokerage'
 
-type Mode = 'acquisition' | 'asset-management'
+type Mode = 'acquisition' | 'asset-management' | 'brokerage'
+
+const MODE_LABELS: Record<Mode, string> = {
+  acquisition: 'Acquisition',
+  'asset-management': 'Asset Management',
+  brokerage: 'Brokerage',
+}
 
 const DATASETS: Record<Mode, { items: Item[]; stages: Stage[]; title: string; subtitle: string }> = {
   acquisition: {
     items: ACQ_ITEMS,
     stages: ACQ_STAGES,
     title: 'The Underwriting Journey',
-    subtitle: 'From first hearing about a lead via an exposé to making the decision to buy it',
+    subtitle: 'From first hearing about a lead via an expos\u00e9 to making the decision to buy it',
   },
   'asset-management': {
     items: AM_ITEMS,
     stages: AM_STAGES,
     title: 'The Asset Management Journey',
     subtitle: 'From closing the deal to managing the asset month to month',
+  },
+  brokerage: {
+    items: BROKERAGE_ITEMS,
+    stages: BROKERAGE_STAGES,
+    title: 'The Brokerage Journey',
+    subtitle: 'From first contact with a property owner to closing and key handover',
   },
 }
 
@@ -141,7 +154,7 @@ export default function ContextGraph() {
       <div className={`fixed inset-0 bg-[#08090a] z-50 flex flex-col items-center justify-center transition-opacity duration-500 ${introVisible ? '' : 'opacity-0 pointer-events-none'}`}>
         {/* Mode toggle */}
         <div className="absolute top-6 left-1/2 -translate-x-1/2 flex bg-white/[0.04] rounded-md p-0.5 border border-white/[0.06]">
-          {(['acquisition', 'asset-management'] as Mode[]).map(m => (
+          {(Object.keys(MODE_LABELS) as Mode[]).map(m => (
             <button
               key={m}
               onClick={() => switchMode(m)}
@@ -149,7 +162,7 @@ export default function ContextGraph() {
                 mode === m ? 'bg-white/[0.08] text-white' : 'text-[#666] hover:text-[#999]'
               }`}
             >
-              {m === 'acquisition' ? 'Acquisition' : 'Asset Management'}
+              {MODE_LABELS[m]}
             </button>
           ))}
         </div>
@@ -287,7 +300,7 @@ export default function ContextGraph() {
       {/* Controls */}
       <div className="px-12 pb-6 pt-3 flex items-center gap-3.5 shrink-0">
         <div className="flex bg-white/[0.04] rounded p-0.5 border border-white/[0.06] shrink-0">
-          {(['acquisition', 'asset-management'] as Mode[]).map(m => (
+          {(Object.keys(MODE_LABELS) as Mode[]).map(m => (
             <button
               key={m}
               onClick={() => switchMode(m)}
@@ -295,7 +308,7 @@ export default function ContextGraph() {
                 mode === m ? 'bg-white/[0.08] text-white' : 'text-[#555] hover:text-[#888]'
               }`}
             >
-              {m === 'acquisition' ? 'ACQ' : 'AM'}
+              {m === 'acquisition' ? 'ACQ' : m === 'asset-management' ? 'AM' : 'BRK'}
             </button>
           ))}
         </div>
