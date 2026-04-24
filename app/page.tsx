@@ -124,8 +124,11 @@ export default function ContextGraph() {
     'Intro Page Gap':     [4.5, 1, 8],
   })
 
-  const chronoZ = useMemo(() => chronoPositions(items, params['Page Spacing']), [items, params['Page Spacing']])
-  const clusterZ = useMemo(() => clusterPositions(items, params['Page Spacing'], params['Group Gap']), [items, params['Page Spacing'], params['Group Gap']])
+  // Target ~480px of visual z-depth (fills viewport after rotation).
+  // After rotateX(64°), z projects upward by sin(64°) ≈ 0.9, so 480/0.9 ≈ 530px z-depth.
+  const effectiveSp = Math.min(params['Page Spacing'], 530 / items.length)
+  const chronoZ = useMemo(() => chronoPositions(items, effectiveSp), [items, effectiveSp])
+  const clusterZ = useMemo(() => clusterPositions(items, effectiveSp, params['Group Gap']), [items, effectiveSp, params['Group Gap']])
   const isClustered = current >= stages.length
 
   const goTo = useCallback((idx: number) => {
@@ -255,7 +258,7 @@ export default function ContextGraph() {
       <div className="flex flex-1 min-h-0">
         {/* Stack */}
         <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-          <div style={{ perspective: params['Perspective'], perspectiveOrigin: '58% 20%', width: 560, height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 48, transform: `scale(${Math.min(0.85, 280 / (items.length * params['Page Spacing'] * 0.9)).toFixed(3)})`, transformOrigin: 'center bottom' }}>
+          <div style={{ perspective: params['Perspective'], perspectiveOrigin: '58% 20%', width: 560, height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 24 }}>
             <div style={{ position: 'relative', transformStyle: 'preserve-3d', transform: stackTransform, width: params['Page Width'], height: params['Page Height'], transition: 'transform 0.6s cubic-bezier(0.4,0,0.2,1)' }}>
               {items.map((it, i) => {
                 const z = isClustered ? clusterZ[i] : chronoZ[i]
