@@ -124,9 +124,9 @@ export default function ContextGraph() {
     'Intro Page Gap':     [4.5, 1, 8],
   })
 
-  // Target ~480px of visual z-depth (fills viewport after rotation).
-  // After rotateX(64°), z projects upward by sin(64°) ≈ 0.9, so 480/0.9 ≈ 530px z-depth.
-  const effectiveSp = Math.min(params['Page Spacing'], 530 / items.length)
+  // Target ~340px of visual z-depth after rotation.
+  // After rotateX(64°), sin(64°) ≈ 0.9, so 340/0.9 ≈ 380px z-depth.
+  const effectiveSp = Math.min(params['Page Spacing'], 380 / items.length)
   const chronoZ = useMemo(() => chronoPositions(items, effectiveSp), [items, effectiveSp])
   const clusterZ = useMemo(() => clusterPositions(items, effectiveSp, params['Group Gap']), [items, effectiveSp, params['Group Gap']])
   const isClustered = current >= stages.length
