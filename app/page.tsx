@@ -10,13 +10,15 @@ import {
 } from './data'
 import { AM_ITEMS, AM_STAGES } from './data-am'
 import { BROKERAGE_ITEMS, BROKERAGE_STAGES } from './data-brokerage'
+import { PROPERTI_ITEMS, PROPERTI_STAGES } from './data-properti'
 
-type Mode = 'acquisition' | 'asset-management' | 'brokerage'
+type Mode = 'acquisition' | 'asset-management' | 'brokerage' | 'properti'
 
 const MODE_LABELS: Record<Mode, string> = {
   acquisition: 'Acquisition',
   'asset-management': 'Asset Management',
   brokerage: 'Brokerage',
+  properti: 'Properti',
 }
 
 const DATASETS: Record<Mode, { items: Item[]; stages: Stage[]; title: string; subtitle: string }> = {
@@ -37,6 +39,12 @@ const DATASETS: Record<Mode, { items: Item[]; stages: Stage[]; title: string; su
     stages: BROKERAGE_STAGES,
     title: 'The Brokerage Journey',
     subtitle: 'From first contact with a property owner to closing and key handover',
+  },
+  properti: {
+    items: PROPERTI_ITEMS,
+    stages: PROPERTI_STAGES,
+    title: 'The Properti Journey',
+    subtitle: 'AI handles 8 of 9 steps. The agent handles the one that matters: trust',
   },
 }
 
@@ -318,7 +326,7 @@ export default function ContextGraph() {
                 mode === m ? 'bg-white/[0.08] text-white' : 'text-[#555] hover:text-[#888]'
               }`}
             >
-              {m === 'acquisition' ? 'ACQ' : m === 'asset-management' ? 'AM' : 'BRK'}
+              {m === 'acquisition' ? 'ACQ' : m === 'asset-management' ? 'AM' : m === 'brokerage' ? 'BRK' : 'PRP'}
             </button>
           ))}
         </div>
@@ -371,6 +379,7 @@ function StageContent({ idx, items: allItems, stages }: { idx: number; items: It
               <th className="text-left text-[#777] font-semibold uppercase tracking-wider px-3 py-2">Step</th>
               <th className="text-left text-[#777] font-semibold uppercase tracking-wider px-3 py-2 w-16">Type</th>
               <th className="text-left text-[#777] font-semibold uppercase tracking-wider px-3 py-2 w-20">Where</th>
+              {stageItems.some(it => it.auto) && <th className="text-left text-[#777] font-semibold uppercase tracking-wider px-3 py-2 w-20">Auto</th>}
             </tr>
           </thead>
           <tbody>
@@ -387,6 +396,15 @@ function StageContent({ idx, items: allItems, stages }: { idx: number; items: It
                   </span>
                 </td>
                 <td className={`px-3 py-1.5 ${it.rec ? 'text-[#999]' : 'text-[#B84D7A]'}`}>{it.cap}</td>
+                {stageItems.some(x => x.auto) && (
+                  <td className="px-3 py-1.5">
+                    {it.auto ? (
+                      <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-[#3D8B80]/15 text-[#5BB8AA]">{it.auto}</span>
+                    ) : (
+                      <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-[#B84D7A]/10 text-[#B84D7A]">Manual</span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

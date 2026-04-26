@@ -18,6 +18,7 @@ export interface Item {
   rec: boolean    // recorded?
   cap: string     // captured in (Email, Slack, Excel, Memory, etc.)
   r?: string      // reason (for decisions)
+  auto?: string   // automation tool (Lead Engine, PIA, IREA, Aria, Peer)
 }
 
 export interface Stage {
