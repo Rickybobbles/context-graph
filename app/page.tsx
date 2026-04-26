@@ -310,7 +310,7 @@ export default function ContextGraph() {
         </div>
 
         {/* Content */}
-        <div className="w-[420px] py-12 pr-12 flex flex-col justify-center overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="w-[420px] pt-12 pb-6 pr-12 flex flex-col justify-start overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {isClustered ? <CombinedContent items={items} stages={stages} allDecisions={allDecisions} totalRecorded={totalRecorded} typeTotals={typeTotals} /> : <StageContent idx={current} items={items} stages={stages} />}
         </div>
       </div>
@@ -372,7 +372,7 @@ function StageContent({ idx, items: allItems, stages }: { idx: number; items: It
       <p className="text-[13px] text-[#aaa] leading-[1.7] mb-4">{st.desc}</p>
 
       {/* Steps table */}
-      <div className="mb-4 border border-white/[0.04] rounded-lg overflow-hidden">
+      <div className="mb-4 border border-white/[0.04] rounded-lg overflow-hidden shrink-0">
         <table className="w-full text-[10px]">
           <thead>
             <tr className="border-b border-white/[0.04]">
