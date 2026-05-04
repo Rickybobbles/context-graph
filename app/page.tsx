@@ -75,8 +75,8 @@ const AI_LEVEL_DEFAULTS: Record<AiLevel, { bg: string; border: string; label: st
   human:    { bg: '#2D6B6E', border: '#1F5558', label: 'Agent / Broker' },
 }
 
-function aiLevelPositions(items: Item[], stages: Stage[], pageSp: number, groupGap: number) {
-  const indexed = items.map((it, i) => ({ aiLevel: stages[it.s]?.aiLevel || 'human', idx: i }))
+function aiLevelPositions(items: Item[], stageLevels: AiLevel[], pageSp: number, groupGap: number) {
+  const indexed = items.map((it, i) => ({ aiLevel: stageLevels[it.s] || 'human', idx: i }))
   indexed.sort((a, b) => AI_LEVEL_ORDER.indexOf(a.aiLevel) - AI_LEVEL_ORDER.indexOf(b.aiLevel))
   const positions = new Array<number>(items.length).fill(0)
   let z = 0
@@ -108,8 +108,8 @@ function pageBg(it: Item, stageColor?: string) {
   return TYPE_META[it.t].color
 }
 
-function pageBgClustered(it: Item, stages: Stage[], colors: Record<AiLevel, { bg: string }>) {
-  const level = stages[it.s]?.aiLevel
+function pageBgClustered(it: Item, stageLevels: AiLevel[], colors: Record<AiLevel, { bg: string }>) {
+  const level = stageLevels[it.s]
   if (level) return colors[level].bg
   return pageBg(it)
 }
@@ -164,20 +164,46 @@ export default function ContextGraph() {
     'Hover Duration':     [0.3, 0.05, 0.8],
     'Intro Scale':        [1, 0.4, 1.2],
     'Intro Page Gap':     [4.5, 1, 8],
-    'Card Stroke':        [0.8, 0, 2],
+    'Card Stroke':        [1.5, 0, 4],
   })
 
-  const segColors = useDialKit('Segment Colors', {
-    'Automate':           '#2A2A2A',
-    'Augment':            '#D4A0A0',
-    'Agent / Broker':     '#2D6B6E',
+  // Segment split: how many stages go into each band (out of 9 total)
+  // Default: automate=3 (Lead Gen, Agent Alloc, Seller-Buyer Match),
+  //          human=1 (Visit & Consultation), augment=rest (5)
+  const segSplit = useDialKit('Segment Split', {
+    'Automate Stages':    [3, 0, 9],
+    'Human Stages':       [1, 0, 9],
   })
 
-  const aiLevelColors: Record<AiLevel, { bg: string; border: string; label: string }> = useMemo(() => ({
-    automate: { bg: segColors['Automate'], border: segColors['Automate'] + '99', label: 'Automate' },
-    augment:  { bg: segColors['Augment'], border: segColors['Augment'] + '99', label: 'Augment' },
-    human:    { bg: segColors['Agent / Broker'], border: segColors['Agent / Broker'] + '99', label: 'Agent / Broker' },
-  }), [segColors])
+  // Compute aiLevel per stage based on split sliders
+  // Sort stages by automation % and assign: top N = automate, bottom M = human, rest = augment
+  const stageAiLevels = useMemo(() => {
+    const autoCount = Math.round(segSplit['Automate Stages'])
+    const humanCount = Math.round(segSplit['Human Stages'])
+    // Rank stages by automation (stages with auto field items / total items)
+    const ranked = stages.map((st, si) => {
+      const stageItems = items.filter(it => it.s === si)
+      const autoItems = stageItems.filter(it => it.auto).length
+      const ratio = stageItems.length > 0 ? autoItems / stageItems.length : 0
+      return { si, ratio }
+    }).sort((a, b) => b.ratio - a.ratio)
+
+    const levels: AiLevel[] = new Array(stages.length).fill('augment')
+    // Most automated → automate
+    for (let i = 0; i < Math.min(autoCount, ranked.length); i++) {
+      levels[ranked[i].si] = 'automate'
+    }
+    // Least automated → human
+    const reversed = [...ranked].reverse()
+    for (let i = 0; i < Math.min(humanCount, reversed.length); i++) {
+      if (levels[reversed[i].si] !== 'automate') {
+        levels[reversed[i].si] = 'human'
+      }
+    }
+    return levels
+  }, [stages, items, segSplit])
+
+  const aiLevelColors = AI_LEVEL_DEFAULTS
 
   const perMode = useDialKit('Per-Mode Overrides', {
     'Stack Offset Y':     [0, -200, 200],
@@ -192,9 +218,9 @@ export default function ContextGraph() {
   const chronoZ = useMemo(() => chronoPositions(items, effectiveSp), [items, effectiveSp])
   const clusterZ = useMemo(() =>
     mode === 'properti'
-      ? aiLevelPositions(items, stages, effectiveSp, params['Group Gap'])
+      ? aiLevelPositions(items, stageAiLevels, effectiveSp, params['Group Gap'])
       : clusterPositions(items, effectiveSp, params['Group Gap']),
-    [items, stages, effectiveSp, params['Group Gap'], mode])
+    [items, stageAiLevels, effectiveSp, params['Group Gap'], mode])
   const isProperti = mode === 'properti'
   const isClustered = isProperti ? current === 1 : current >= stages.length
 
@@ -331,9 +357,9 @@ export default function ContextGraph() {
                 const z = isClustered ? clusterZ[i] : chronoZ[i]
                 const isActive = isClustered || (isProperti && current === 0) || it.s === current
                 const stageColor = isProperti ? stages[it.s]?.color : undefined
-                const bg = isClustered && isProperti ? pageBgClustered(it, stages, aiLevelColors) : pageBg(it, stageColor)
+                const bg = isClustered && isProperti ? pageBgClustered(it, stageAiLevels, aiLevelColors) : pageBg(it, stageColor)
                 const bdr = isProperti && stageColor
-                  ? (isClustered ? aiLevelColors[stages[it.s]?.aiLevel || 'human'].border : borderForStage(stageColor))
+                  ? (isClustered ? aiLevelColors[stageAiLevels[it.s] || 'human'].border : borderForStage(stageColor))
                   : borderColor(it)
                 const stroke = params['Card Stroke']
                 return (
@@ -343,7 +369,7 @@ export default function ContextGraph() {
                     backfaceVisibility: 'hidden',
                     background: bg,
                     border: `${params['Border Width']}px solid ${bdr}`,
-                    outline: stroke > 0 ? `${stroke}px solid rgba(255,255,255,0.15)` : undefined,
+                    outline: stroke > 0 ? `${stroke}px solid rgba(0,0,0,0.35)` : undefined,
                     outlineOffset: -stroke,
                     opacity: isActive ? 1 : params['Dim Opacity'],
                     transform: `translate3d(0,0,${z}px) scale(${isActive && !isClustered ? 1.03 : 1})`,
@@ -372,7 +398,7 @@ export default function ContextGraph() {
         {/* Content */}
         <div className="w-[420px] pt-12 pb-6 pr-12 flex flex-col justify-start overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {isClustered
-            ? <CombinedContent items={items} stages={stages} allDecisions={allDecisions} totalRecorded={totalRecorded} typeTotals={typeTotals} mode={mode} aiColors={aiLevelColors} />
+            ? <CombinedContent items={items} stages={stages} allDecisions={allDecisions} totalRecorded={totalRecorded} typeTotals={typeTotals} mode={mode} aiColors={aiLevelColors} stageLevels={stageAiLevels} />
             : isProperti && current === 0
               ? <PropertiOverview items={items} stages={stages} />
               : <StageContent idx={current} items={items} stages={stages} />
@@ -512,14 +538,15 @@ function StageContent({ idx, items: allItems, stages }: { idx: number; items: It
 }
 
 /* ── Combined Content ── */
-function CombinedContent({ items, stages, allDecisions, totalRecorded, typeTotals, mode, aiColors }: {
+function CombinedContent({ items, stages, allDecisions, totalRecorded, typeTotals, mode, aiColors, stageLevels }: {
   items: Item[]; stages: Stage[];
   allDecisions: Item[]; totalRecorded: number;
   typeTotals: Partial<Record<ItemType, number>>;
   mode: Mode;
   aiColors: Record<AiLevel, { bg: string; border: string; label: string }>;
+  stageLevels: AiLevel[];
 }) {
-  if (mode === 'properti') return <PropertiCombined items={items} stages={stages} colors={aiColors} />
+  if (mode === 'properti') return <PropertiCombined items={items} stages={stages} colors={aiColors} stageLevels={stageLevels} />
 
   const labels = [...CLUSTER_ORDER].reverse().map(type => ({
     type, ...TYPE_META[type], count: typeTotals[type] || 0,
@@ -606,14 +633,14 @@ function PropertiOverview({ items, stages }: { items: Item[]; stages: Stage[] })
 }
 
 /* ── Properti Combined: Automate / Augment / Human ── */
-function PropertiCombined({ items, stages, colors }: { items: Item[]; stages: Stage[]; colors: Record<AiLevel, { bg: string; border: string; label: string }> }) {
+function PropertiCombined({ items, stages, colors, stageLevels }: { items: Item[]; stages: Stage[]; colors: Record<AiLevel, { bg: string; border: string; label: string }>; stageLevels: AiLevel[] }) {
   const counts: Record<AiLevel, { items: number; hours: number; stages: string[] }> = {
     automate: { items: 0, hours: 0, stages: [] },
     augment:  { items: 0, hours: 0, stages: [] },
     human:    { items: 0, hours: 0, stages: [] },
   }
   stages.forEach((st, si) => {
-    const level = st.aiLevel || 'human'
+    const level = stageLevels[si] || 'human'
     const stageItems = items.filter(it => it.s === si).length
     counts[level].items += stageItems
     counts[level].hours += st.hours || 0
