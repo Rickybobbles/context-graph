@@ -369,7 +369,7 @@ export default function ContextGraph() {
                     backfaceVisibility: 'hidden',
                     background: bg,
                     border: `${params['Border Width']}px solid ${bdr}`,
-                    outline: stroke > 0 ? `${stroke}px solid rgba(0,0,0,0.35)` : undefined,
+                    outline: stroke > 0 ? `${stroke}px solid ${bg === '#2A2A2A' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.35)'}` : undefined,
                     outlineOffset: -stroke,
                     opacity: isActive ? 1 : params['Dim Opacity'],
                     transform: `translate3d(0,0,${z}px) scale(${isActive && !isClustered ? 1.03 : 1})`,
@@ -396,7 +396,7 @@ export default function ContextGraph() {
         </div>
 
         {/* Content */}
-        <div className="w-[420px] pt-12 pb-6 pr-12 flex flex-col justify-start overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className={`w-[420px] pr-12 flex flex-col overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${isProperti && !isClustered ? 'justify-end pb-24' : 'justify-start pt-12 pb-6'}`}>
           {isClustered
             ? <CombinedContent items={items} stages={stages} allDecisions={allDecisions} totalRecorded={totalRecorded} typeTotals={typeTotals} mode={mode} aiColors={aiLevelColors} stageLevels={stageAiLevels} />
             : isProperti && current === 0
@@ -594,16 +594,15 @@ function CombinedContent({ items, stages, allDecisions, totalRecorded, typeTotal
 
 /* ── Properti Overview: full stack with stage labels ── */
 function PropertiOverview({ items, stages }: { items: Item[]; stages: Stage[] }) {
-  const totalHours = stages.reduce((sum, st) => sum + (st.hours || 0), 0)
   return (
     <>
       <div className="text-[10px] font-semibold tracking-[2px] uppercase text-[#888] mb-1.5">Full Stack</div>
       <div className="text-2xl font-bold tracking-tight text-white mb-2">The Transaction Today</div>
-      <p className="text-[13px] text-[#aaa] leading-[1.7] mb-6">
-        {items.length} steps across {stages.length} stages. ~{totalHours} hours from lead to close.
+      <p className="text-[13px] text-[#aaa] leading-[1.7] mb-4">
+        ~80 hours end to end from receiving a lead to closing it.
       </p>
 
-      <div className="flex flex-col gap-1 mb-4">
+      <div className="flex flex-col gap-1">
         {[...stages].reverse().map((st, ri) => {
           const si = stages.length - 1 - ri
           const count = items.filter(it => it.s === si).length
@@ -621,12 +620,6 @@ function PropertiOverview({ items, stages }: { items: Item[]; stages: Stage[] })
             </div>
           )
         })}
-      </div>
-
-      <div className="pt-3 border-t border-white/[0.06]">
-        <p className="text-xs text-[#aaa] leading-[1.8]">
-          Click <strong className="text-white">Next</strong> to see how this splits into what can be automated, augmented, or must stay human.
-        </p>
       </div>
     </>
   )
