@@ -16,42 +16,49 @@ export const PROPERTI_STAGES: Stage[] = [
     actor: 'Lead Engine (100% automated)',
     captured: 'CRM',
     desc: 'Leads flow in through properti\u2019s website, portals, and Peer (the voice agent that re-engages cold seller leads \u2014 \u20ac1M net revenue in its first 10 months). Lead Engine captures, deduplicates, and routes them automatically. No human touches this step.',
+    color: '#7B8EC8', hours: 2, aiLevel: 'automate',
   },
   {
     title: 'Qualified & Scored',
     actor: 'PIA (80% automated)',
     captured: 'CRM, phone call',
     desc: 'PIA scores and pre-qualifies the lead. But the 20% that\u2019s human is where context lives \u2014 the agent calls the seller, learns they\u2019re divorcing, need to close fast, have emotional attachment to the price. None of that goes into the CRM.',
+    color: '#D4D0CA', hours: 1, aiLevel: 'augment',
   },
   {
     title: 'Agent Allocated',
     actor: 'Lead Engine (100% automated)',
     captured: 'CRM',
     desc: 'Lead Engine assigns the deal to an agent based on location, capacity, and expertise. Fully automated. The agent gets a notification with the lead details \u2014 but not the context from the qualifying call.',
+    color: '#A8C4D8', hours: 0.5, aiLevel: 'automate',
   },
   {
     title: 'Valuation Generated',
     actor: 'IREA + Aria (90% automated)',
     captured: 'Platform, memory',
     desc: 'Aria (the valuation chatbot) auto-fills data from uploaded documents. IREA generates a hedonic valuation. The agent visits, walks the property, and adjusts. Their local knowledge \u2014 the new tram line, the school reputation, the neighbour\u2019s building plans \u2014 shapes the final number but never enters the system.',
+    color: '#B8C98E', hours: 6, aiLevel: 'augment',
   },
   {
     title: 'Activation & Listing',
     actor: 'IREA (90% automated)',
     captured: 'Platform',
     desc: 'When the agent signs the seller contract, AI writes the listing text, geo-targets the audience, uploads photos, and publishes across all marketplaces automatically. The agent reviews and approves \u2014 but their editorial judgment (why this photo, why this angle, what to downplay) is invisible.',
+    color: '#8BA87A', hours: 18, aiLevel: 'augment',
   },
   {
     title: 'Seller-Buyer Matching',
     actor: 'IREA (100% automated)',
     captured: 'Platform',
     desc: 'IREA matches the listing against the buyer database automatically. No human involvement. But the algorithm can\u2019t capture what the agent knows from viewings \u2014 that this couple loved the garden, that this investor only wants south-facing units.',
+    color: '#C9B88C', hours: 8, aiLevel: 'automate',
   },
   {
     title: 'Buyer Qualifying',
     actor: 'PIA (90% automated)',
     captured: 'CRM, phone call',
     desc: 'PIA pre-qualifies buyers: budget, financing status, timeline. But the final 10% \u2014 the agent\u2019s call to assess seriousness, understand motivations, gauge flexibility on price \u2014 happens on the phone and disappears.',
+    color: '#6B9DAB', hours: 12, aiLevel: 'augment',
   },
   {
     title: 'Visit & Consultation',
@@ -59,6 +66,7 @@ export const PROPERTI_STAGES: Stage[] = [
     captured: 'Memory, photos',
     desc: 'The one step that\u2019s fully human. The agent shows the property, reads the room, builds trust, handles objections. This is where deals are won or lost. Every observation, every buyer reaction, every conversation \u2014 it all lives in the agent\u2019s head.',
     isDecisionGate: true,
+    color: '#4A7D8B', hours: 24, aiLevel: 'human',
   },
   {
     title: 'Deal Closed',
@@ -66,6 +74,7 @@ export const PROPERTI_STAGES: Stage[] = [
     captured: 'Legal docs, email, memory',
     desc: 'IREA handles contract generation and workflow. But the 20% that\u2019s human \u2014 negotiation strategy, notary coordination, the decision to accept one offer over another, the handover details \u2014 is where context matters most and is captured least.',
     isDecisionGate: true,
+    color: '#2D6B6E', hours: 8, aiLevel: 'augment',
   },
 ]
 

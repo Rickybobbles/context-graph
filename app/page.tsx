@@ -6,7 +6,7 @@ import {
   ITEMS as ACQ_ITEMS, STAGES as ACQ_STAGES,
   TYPE_META, CLUSTER_ORDER,
   getStageItems, getStageDecisions, getRunningCounts, getTypeTotals,
-  type Item, type ItemType, type Stage,
+  type Item, type ItemType, type Stage, type AiLevel,
 } from './data'
 import { AM_ITEMS, AM_STAGES } from './data-am'
 import { BROKERAGE_ITEMS, BROKERAGE_STAGES } from './data-brokerage'
@@ -68,6 +68,28 @@ function clusterPositions(items: Item[], pageSp: number, groupGap: number) {
   return positions
 }
 
+const AI_LEVEL_ORDER: AiLevel[] = ['automate', 'augment', 'human']
+const AI_LEVEL_COLORS: Record<AiLevel, { bg: string; border: string; label: string }> = {
+  automate: { bg: '#2A2A2A', border: '#444', label: 'Automate' },
+  augment:  { bg: '#D4A0A0', border: '#B08080', label: 'Augment' },
+  human:    { bg: '#2D6B6E', border: '#1F5558', label: 'Agent / Broker' },
+}
+
+function aiLevelPositions(items: Item[], stages: Stage[], pageSp: number, groupGap: number) {
+  const indexed = items.map((it, i) => ({ aiLevel: stages[it.s]?.aiLevel || 'human', idx: i }))
+  indexed.sort((a, b) => AI_LEVEL_ORDER.indexOf(a.aiLevel) - AI_LEVEL_ORDER.indexOf(b.aiLevel))
+  const positions = new Array<number>(items.length).fill(0)
+  let z = 0
+  let prev: AiLevel | null = null
+  for (const { aiLevel, idx } of indexed) {
+    if (prev && aiLevel !== prev) z += groupGap * 2.5
+    positions[idx] = z
+    z += pageSp
+    prev = aiLevel
+  }
+  return positions
+}
+
 /* ── Border color per type ── */
 function borderColor(it: Item) {
   if (it.t === 'information') return '#b0aca6'
@@ -79,10 +101,22 @@ function borderColor(it: Item) {
   return '#4a4a4a'
 }
 
-function pageBg(it: Item) {
+function pageBg(it: Item, stageColor?: string) {
+  if (stageColor) return stageColor
   if (it.t === 'discarded') return '#3a3a3a'
   if (it.t === 'decision' && !it.rec) return '#1f1420'
   return TYPE_META[it.t].color
+}
+
+function pageBgClustered(it: Item, stages: Stage[]) {
+  const level = stages[it.s]?.aiLevel
+  if (level) return AI_LEVEL_COLORS[level].bg
+  return pageBg(it)
+}
+
+function borderForStage(stageColor: string) {
+  // Darken the stage color slightly for the border
+  return stageColor + 'cc'
 }
 
 export default function ContextGraph() {
@@ -143,8 +177,13 @@ export default function ContextGraph() {
   const maxZ = perMode['Max Stack Height'] / 0.9
   const effectiveSp = Math.min(params['Page Spacing'], (maxZ - groupGapTotal) / items.length)
   const chronoZ = useMemo(() => chronoPositions(items, effectiveSp), [items, effectiveSp])
-  const clusterZ = useMemo(() => clusterPositions(items, effectiveSp, params['Group Gap']), [items, effectiveSp, params['Group Gap']])
+  const clusterZ = useMemo(() =>
+    mode === 'properti'
+      ? aiLevelPositions(items, stages, effectiveSp, params['Group Gap'])
+      : clusterPositions(items, effectiveSp, params['Group Gap']),
+    [items, stages, effectiveSp, params['Group Gap'], mode])
   const isClustered = current >= stages.length
+  const isProperti = mode === 'properti'
 
   const goTo = useCallback((idx: number) => {
     if (idx >= 0 && idx < TOTAL_STEPS) setCurrent(idx)
@@ -210,8 +249,8 @@ export default function ContextGraph() {
                     style={{
                       position: 'absolute', width: 160, height: 115, left: 0, top: 0, borderRadius: 8,
                       backfaceVisibility: 'hidden',
-                      background: pageBg(it),
-                      border: `1px ${it.rec ? 'solid' : 'dashed'} ${isHovered ? 'rgba(255,255,255,0.25)' : borderColor(it)}`,
+                      background: pageBg(it, isProperti ? stages[it.s]?.color : undefined),
+                      border: `1px solid ${isHovered ? 'rgba(255,255,255,0.25)' : (isProperti && stages[it.s]?.color ? borderForStage(stages[it.s].color!) : borderColor(it))}`,
                       transform: `translate3d(0,0,${baseZ + offset}px)`,
                       transition: `border-color 0.15s ease, transform ${params['Hover Duration']}s cubic-bezier(0.16,1,0.3,1)`,
                     }}
@@ -278,13 +317,18 @@ export default function ContextGraph() {
               {items.map((it, i) => {
                 const z = isClustered ? clusterZ[i] : chronoZ[i]
                 const isActive = isClustered || it.s === current
+                const stageColor = isProperti ? stages[it.s]?.color : undefined
+                const bg = isClustered && isProperti ? pageBgClustered(it, stages) : pageBg(it, stageColor)
+                const bdr = isProperti && stageColor
+                  ? (isClustered ? AI_LEVEL_COLORS[stages[it.s]?.aiLevel || 'human'].border : borderForStage(stageColor))
+                  : borderColor(it)
                 return (
                   <div key={i} style={{
                     position: 'absolute', width: params['Page Width'], height: params['Page Height'], left: 0, top: 0,
                     borderRadius: params['Border Radius'],
                     backfaceVisibility: 'hidden',
-                    background: pageBg(it),
-                    border: `${params['Border Width']}px ${it.rec ? 'solid' : 'dashed'} ${borderColor(it)}`,
+                    background: bg,
+                    border: `${params['Border Width']}px solid ${bdr}`,
                     opacity: isActive ? 1 : params['Dim Opacity'],
                     transform: `translate3d(0,0,${z}px) scale(${isActive && !isClustered ? 1.03 : 1})`,
                     transition: 'opacity 0.5s cubic-bezier(0.4,0,0.2,1), transform 0.5s cubic-bezier(0.4,0,0.2,1)',
@@ -311,7 +355,7 @@ export default function ContextGraph() {
 
         {/* Content */}
         <div className="w-[420px] pt-12 pb-6 pr-12 flex flex-col justify-start overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {isClustered ? <CombinedContent items={items} stages={stages} allDecisions={allDecisions} totalRecorded={totalRecorded} typeTotals={typeTotals} /> : <StageContent idx={current} items={items} stages={stages} />}
+          {isClustered ? <CombinedContent items={items} stages={stages} allDecisions={allDecisions} totalRecorded={totalRecorded} typeTotals={typeTotals} mode={mode} /> : <StageContent idx={current} items={items} stages={stages} />}
         </div>
       </div>
 
@@ -368,6 +412,7 @@ function StageContent({ idx, items: allItems, stages }: { idx: number; items: It
       <div className="text-[11px] text-[#888] mb-4 flex gap-4 flex-wrap">
         <span className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-[#888]" />{st.actor}</span>
         <span className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-sm bg-[#888]" />Captured in: {st.captured}</span>
+        {st.hours != null && <span className="flex items-center gap-1.5"><span className="w-1 h-1 rounded bg-[#888]" />~{st.hours}h per deal</span>}
       </div>
       <p className="text-[13px] text-[#aaa] leading-[1.7] mb-4">{st.desc}</p>
 
@@ -446,11 +491,14 @@ function StageContent({ idx, items: allItems, stages }: { idx: number; items: It
 }
 
 /* ── Combined Content ── */
-function CombinedContent({ items, stages, allDecisions, totalRecorded, typeTotals }: {
+function CombinedContent({ items, stages, allDecisions, totalRecorded, typeTotals, mode }: {
   items: Item[]; stages: Stage[];
   allDecisions: Item[]; totalRecorded: number;
   typeTotals: Partial<Record<ItemType, number>>;
+  mode: Mode;
 }) {
+  if (mode === 'properti') return <PropertiCombined items={items} stages={stages} />
+
   const labels = [...CLUSTER_ORDER].reverse().map(type => ({
     type, ...TYPE_META[type], count: typeTotals[type] || 0,
   }))
@@ -490,6 +538,67 @@ function CombinedContent({ items, stages, allDecisions, totalRecorded, typeTotal
           <span className="text-[28px] font-extrabold text-[#888] leading-none">{allDecisions.length}</span>
         </div>
         <span className="text-[11px] text-[#888] font-medium ml-2">decisions recorded</span>
+      </div>
+    </>
+  )
+}
+
+/* ── Properti Combined: Automate / Augment / Human ── */
+function PropertiCombined({ items, stages }: { items: Item[]; stages: Stage[] }) {
+  const counts: Record<AiLevel, { items: number; hours: number; stages: string[] }> = {
+    automate: { items: 0, hours: 0, stages: [] },
+    augment:  { items: 0, hours: 0, stages: [] },
+    human:    { items: 0, hours: 0, stages: [] },
+  }
+  stages.forEach((st, si) => {
+    const level = st.aiLevel || 'human'
+    const stageItems = items.filter(it => it.s === si).length
+    counts[level].items += stageItems
+    counts[level].hours += st.hours || 0
+    counts[level].stages.push(st.title)
+  })
+
+  const totalHours = stages.reduce((sum, st) => sum + (st.hours || 0), 0)
+
+  return (
+    <>
+      <div className="text-[10px] font-semibold tracking-[2px] uppercase text-[#888] mb-1.5">Split View</div>
+      <div className="text-2xl font-bold tracking-tight text-white mb-2">From Co-Pilot to Autopilot</div>
+      <p className="text-[13px] text-[#aaa] leading-[1.7] mb-6">
+        {items.length} steps across {stages.length} stages, totalling ~{totalHours} hours per deal. Here&rsquo;s how the work breaks down.
+      </p>
+
+      <div className="flex flex-col gap-5 mb-6">
+        {AI_LEVEL_ORDER.map(level => {
+          const c = counts[level]
+          const meta = AI_LEVEL_COLORS[level]
+          const pct = Math.round((c.hours / totalHours) * 100)
+          return (
+            <div key={level} className="flex items-start gap-3">
+              <div className="w-1 shrink-0 rounded-full mt-1" style={{ height: Math.max(20, c.items * 1.5), background: meta.bg === '#2A2A2A' ? '#666' : meta.bg }} />
+              <div>
+                <div className="text-[11px] font-bold tracking-[1.5px] uppercase mb-0.5" style={{ color: meta.bg === '#2A2A2A' ? '#999' : meta.bg }}>
+                  {meta.label}
+                </div>
+                <div className="text-[10px] text-[#888] mb-1">
+                  {c.items} steps &middot; ~{c.hours}h &middot; {pct}% of time
+                </div>
+                <div className="text-[10px] text-[#666]">
+                  {c.stages.join(', ')}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="pt-3 border-t border-white/[0.06]">
+        <p className="text-xs text-[#aaa] leading-[1.8]">
+          <strong className="text-[#ccc]">65% automated today.</strong> The agent spends 70% of their time on what matters — selling, consulting, building trust.
+        </p>
+        <p className="text-xs text-[#888] leading-[1.8] mt-1">
+          Target: <strong className="text-[#ccc]">90%+ automation.</strong> The last mile is what we&rsquo;re building.
+        </p>
       </div>
     </>
   )

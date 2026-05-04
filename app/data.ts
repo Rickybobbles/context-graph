@@ -21,12 +21,17 @@ export interface Item {
   auto?: string   // automation tool (Lead Engine, PIA, IREA, Aria, Peer)
 }
 
+export type AiLevel = 'automate' | 'augment' | 'human'
+
 export interface Stage {
   title: string
   actor: string
   captured: string
   desc: string
   isDecisionGate?: boolean
+  color?: string         // stage-specific color for visual
+  hours?: number         // estimated hours per stage
+  aiLevel?: AiLevel      // automate / augment / human
 }
 
 export const TYPE_META: Record<ItemType, { color: string; label: string }> = {
