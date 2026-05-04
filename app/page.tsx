@@ -396,7 +396,7 @@ export default function ContextGraph() {
         </div>
 
         {/* Content */}
-        <div className={`w-[420px] pr-12 flex flex-col overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${isProperti && !isClustered ? 'justify-end pb-24' : 'justify-start pt-12 pb-6'}`}>
+        <div className={`w-[420px] pr-12 flex flex-col overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden justify-start pt-12 pb-6`}>
           {isClustered
             ? <CombinedContent items={items} stages={stages} allDecisions={allDecisions} totalRecorded={totalRecorded} typeTotals={typeTotals} mode={mode} aiColors={aiLevelColors} stageLevels={stageAiLevels} />
             : isProperti && current === 0
