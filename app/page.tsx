@@ -152,7 +152,7 @@ export default function ContextGraph() {
     'Group Gap':          [21, 2, 40],
     'Rotate X':           [64, 20, 80],
     'Rotate Z':           [-42, -60, -10],
-    'Perspective':        [1400, 400, 3000],
+    'Perspective':        [3000, 400, 4000],
     'Page Width':         [300, 120, 400],
     'Page Height':        [230, 80, 300],
     'Border Width':       [1.9, 0, 3],
