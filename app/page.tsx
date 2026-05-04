@@ -69,7 +69,7 @@ function clusterPositions(items: Item[], pageSp: number, groupGap: number) {
 }
 
 const AI_LEVEL_ORDER: AiLevel[] = ['automate', 'augment', 'human']
-const AI_LEVEL_COLORS: Record<AiLevel, { bg: string; border: string; label: string }> = {
+const AI_LEVEL_DEFAULTS: Record<AiLevel, { bg: string; border: string; label: string }> = {
   automate: { bg: '#2A2A2A', border: '#444', label: 'Automate' },
   augment:  { bg: '#D4A0A0', border: '#B08080', label: 'Augment' },
   human:    { bg: '#2D6B6E', border: '#1F5558', label: 'Agent / Broker' },
@@ -108,9 +108,9 @@ function pageBg(it: Item, stageColor?: string) {
   return TYPE_META[it.t].color
 }
 
-function pageBgClustered(it: Item, stages: Stage[]) {
+function pageBgClustered(it: Item, stages: Stage[], colors: Record<AiLevel, { bg: string }>) {
   const level = stages[it.s]?.aiLevel
-  if (level) return AI_LEVEL_COLORS[level].bg
+  if (level) return colors[level].bg
   return pageBg(it)
 }
 
@@ -127,7 +127,7 @@ export default function ContextGraph() {
   const [introMounted, setIntroMounted] = useState(false)
 
   const { items, stages, title, subtitle } = DATASETS[mode]
-  const TOTAL_STEPS = stages.length + 1
+  const TOTAL_STEPS = mode === 'properti' ? 2 : stages.length + 1
 
   const allDecisions = useMemo(() => items.filter(it => it.t === 'decision'), [items])
   const totalRecorded = useMemo(() => allDecisions.filter(it => it.rec).length, [allDecisions])
@@ -164,7 +164,20 @@ export default function ContextGraph() {
     'Hover Duration':     [0.3, 0.05, 0.8],
     'Intro Scale':        [1, 0.4, 1.2],
     'Intro Page Gap':     [4.5, 1, 8],
+    'Card Stroke':        [0.8, 0, 2],
   })
+
+  const segColors = useDialKit('Segment Colors', {
+    'Automate':           '#2A2A2A',
+    'Augment':            '#D4A0A0',
+    'Agent / Broker':     '#2D6B6E',
+  })
+
+  const aiLevelColors: Record<AiLevel, { bg: string; border: string; label: string }> = useMemo(() => ({
+    automate: { bg: segColors['Automate'], border: segColors['Automate'] + '99', label: 'Automate' },
+    augment:  { bg: segColors['Augment'], border: segColors['Augment'] + '99', label: 'Augment' },
+    human:    { bg: segColors['Agent / Broker'], border: segColors['Agent / Broker'] + '99', label: 'Agent / Broker' },
+  }), [segColors])
 
   const perMode = useDialKit('Per-Mode Overrides', {
     'Stack Offset Y':     [0, -200, 200],
@@ -182,8 +195,8 @@ export default function ContextGraph() {
       ? aiLevelPositions(items, stages, effectiveSp, params['Group Gap'])
       : clusterPositions(items, effectiveSp, params['Group Gap']),
     [items, stages, effectiveSp, params['Group Gap'], mode])
-  const isClustered = current >= stages.length
   const isProperti = mode === 'properti'
+  const isClustered = isProperti ? current === 1 : current >= stages.length
 
   const goTo = useCallback((idx: number) => {
     if (idx >= 0 && idx < TOTAL_STEPS) setCurrent(idx)
@@ -316,12 +329,13 @@ export default function ContextGraph() {
             <div style={{ position: 'relative', transformStyle: 'preserve-3d', transform: `${stackTransform} translateY(${perMode['Stack Offset Y']}px)`, width: params['Page Width'], height: params['Page Height'], transition: 'transform 0.6s cubic-bezier(0.4,0,0.2,1)' }}>
               {items.map((it, i) => {
                 const z = isClustered ? clusterZ[i] : chronoZ[i]
-                const isActive = isClustered || it.s === current
+                const isActive = isClustered || (isProperti && current === 0) || it.s === current
                 const stageColor = isProperti ? stages[it.s]?.color : undefined
-                const bg = isClustered && isProperti ? pageBgClustered(it, stages) : pageBg(it, stageColor)
+                const bg = isClustered && isProperti ? pageBgClustered(it, stages, aiLevelColors) : pageBg(it, stageColor)
                 const bdr = isProperti && stageColor
-                  ? (isClustered ? AI_LEVEL_COLORS[stages[it.s]?.aiLevel || 'human'].border : borderForStage(stageColor))
+                  ? (isClustered ? aiLevelColors[stages[it.s]?.aiLevel || 'human'].border : borderForStage(stageColor))
                   : borderColor(it)
+                const stroke = params['Card Stroke']
                 return (
                   <div key={i} style={{
                     position: 'absolute', width: params['Page Width'], height: params['Page Height'], left: 0, top: 0,
@@ -329,6 +343,8 @@ export default function ContextGraph() {
                     backfaceVisibility: 'hidden',
                     background: bg,
                     border: `${params['Border Width']}px solid ${bdr}`,
+                    outline: stroke > 0 ? `${stroke}px solid rgba(255,255,255,0.15)` : undefined,
+                    outlineOffset: -stroke,
                     opacity: isActive ? 1 : params['Dim Opacity'],
                     transform: `translate3d(0,0,${z}px) scale(${isActive && !isClustered ? 1.03 : 1})`,
                     transition: 'opacity 0.5s cubic-bezier(0.4,0,0.2,1), transform 0.5s cubic-bezier(0.4,0,0.2,1)',
@@ -355,7 +371,12 @@ export default function ContextGraph() {
 
         {/* Content */}
         <div className="w-[420px] pt-12 pb-6 pr-12 flex flex-col justify-start overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {isClustered ? <CombinedContent items={items} stages={stages} allDecisions={allDecisions} totalRecorded={totalRecorded} typeTotals={typeTotals} mode={mode} /> : <StageContent idx={current} items={items} stages={stages} />}
+          {isClustered
+            ? <CombinedContent items={items} stages={stages} allDecisions={allDecisions} totalRecorded={totalRecorded} typeTotals={typeTotals} mode={mode} aiColors={aiLevelColors} />
+            : isProperti && current === 0
+              ? <PropertiOverview items={items} stages={stages} />
+              : <StageContent idx={current} items={items} stages={stages} />
+          }
         </div>
       </div>
 
@@ -387,7 +408,7 @@ export default function ContextGraph() {
           &larr; Prev
         </button>
         <button onClick={() => goTo(current + 1)} disabled={current === TOTAL_STEPS - 1} className="bg-transparent border border-white/10 text-[#666] px-5 py-1.5 rounded-md text-[11px] font-medium cursor-pointer hover:border-white/20 hover:text-white disabled:opacity-15 disabled:pointer-events-none transition-all whitespace-nowrap">
-          {current === stages.length - 1 ? 'See full stack \u2192' : 'Next \u2192'}
+          {isProperti && current === 0 ? 'See split \u2192' : current === stages.length - 1 ? 'See full stack \u2192' : 'Next \u2192'}
         </button>
         <span className="text-[9px] text-[#333]">or use arrow keys</span>
       </div>
@@ -491,13 +512,14 @@ function StageContent({ idx, items: allItems, stages }: { idx: number; items: It
 }
 
 /* ── Combined Content ── */
-function CombinedContent({ items, stages, allDecisions, totalRecorded, typeTotals, mode }: {
+function CombinedContent({ items, stages, allDecisions, totalRecorded, typeTotals, mode, aiColors }: {
   items: Item[]; stages: Stage[];
   allDecisions: Item[]; totalRecorded: number;
   typeTotals: Partial<Record<ItemType, number>>;
   mode: Mode;
+  aiColors: Record<AiLevel, { bg: string; border: string; label: string }>;
 }) {
-  if (mode === 'properti') return <PropertiCombined items={items} stages={stages} />
+  if (mode === 'properti') return <PropertiCombined items={items} stages={stages} colors={aiColors} />
 
   const labels = [...CLUSTER_ORDER].reverse().map(type => ({
     type, ...TYPE_META[type], count: typeTotals[type] || 0,
@@ -543,8 +565,48 @@ function CombinedContent({ items, stages, allDecisions, totalRecorded, typeTotal
   )
 }
 
+/* ── Properti Overview: full stack with stage labels ── */
+function PropertiOverview({ items, stages }: { items: Item[]; stages: Stage[] }) {
+  const totalHours = stages.reduce((sum, st) => sum + (st.hours || 0), 0)
+  return (
+    <>
+      <div className="text-[10px] font-semibold tracking-[2px] uppercase text-[#888] mb-1.5">Full Stack</div>
+      <div className="text-2xl font-bold tracking-tight text-white mb-2">The Transaction Today</div>
+      <p className="text-[13px] text-[#aaa] leading-[1.7] mb-6">
+        {items.length} steps across {stages.length} stages. ~{totalHours} hours from lead to close.
+      </p>
+
+      <div className="flex flex-col gap-1 mb-4">
+        {[...stages].reverse().map((st, ri) => {
+          const si = stages.length - 1 - ri
+          const count = items.filter(it => it.s === si).length
+          return (
+            <div key={si} className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: st.color }} />
+              <div className="flex-1">
+                <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: st.color }}>
+                  {st.title}
+                </div>
+              </div>
+              <div className="text-[10px] text-[#666] tabular-nums shrink-0">
+                ~{st.hours}h &middot; {count} steps
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="pt-3 border-t border-white/[0.06]">
+        <p className="text-xs text-[#aaa] leading-[1.8]">
+          Click <strong className="text-white">Next</strong> to see how this splits into what can be automated, augmented, or must stay human.
+        </p>
+      </div>
+    </>
+  )
+}
+
 /* ── Properti Combined: Automate / Augment / Human ── */
-function PropertiCombined({ items, stages }: { items: Item[]; stages: Stage[] }) {
+function PropertiCombined({ items, stages, colors }: { items: Item[]; stages: Stage[]; colors: Record<AiLevel, { bg: string; border: string; label: string }> }) {
   const counts: Record<AiLevel, { items: number; hours: number; stages: string[] }> = {
     automate: { items: 0, hours: 0, stages: [] },
     augment:  { items: 0, hours: 0, stages: [] },
@@ -571,7 +633,7 @@ function PropertiCombined({ items, stages }: { items: Item[]; stages: Stage[] })
       <div className="flex flex-col gap-5 mb-6">
         {AI_LEVEL_ORDER.map(level => {
           const c = counts[level]
-          const meta = AI_LEVEL_COLORS[level]
+          const meta = colors[level]
           const pct = Math.round((c.hours / totalHours) * 100)
           return (
             <div key={level} className="flex items-start gap-3">
