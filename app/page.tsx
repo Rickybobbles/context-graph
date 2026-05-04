@@ -381,18 +381,20 @@ export default function ContextGraph() {
             </div>
           </div>
 
-          {/* Legend */}
-          <div className="absolute bottom-6 left-10 flex flex-wrap gap-x-4 gap-y-3">
-            {Object.entries(TYPE_META).map(([type, meta]) => (
-              <div key={type} className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-sm" style={{
-                  background: type === 'discarded' ? '#2a2a2a' : meta.color,
-                  border: type === 'information' ? '1px solid rgba(255,255,255,0.15)' : type === 'discarded' ? '1px solid #3a3a3a' : undefined,
-                }} />
-                <span className="text-[9px] text-[#666] font-medium tracking-wide">{meta.label}</span>
-              </div>
-            ))}
-          </div>
+          {/* Legend — hidden in properti mode */}
+          {!isProperti && (
+            <div className="absolute bottom-6 left-10 flex flex-wrap gap-x-4 gap-y-3">
+              {Object.entries(TYPE_META).map(([type, meta]) => (
+                <div key={type} className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm" style={{
+                    background: type === 'discarded' ? '#2a2a2a' : meta.color,
+                    border: type === 'information' ? '1px solid rgba(255,255,255,0.15)' : type === 'discarded' ? '1px solid #3a3a3a' : undefined,
+                  }} />
+                  <span className="text-[9px] text-[#666] font-medium tracking-wide">{meta.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -643,45 +645,28 @@ function PropertiCombined({ items, stages, colors, stageLevels }: { items: Item[
   const totalHours = stages.reduce((sum, st) => sum + (st.hours || 0), 0)
 
   return (
-    <>
-      <div className="text-[10px] font-semibold tracking-[2px] uppercase text-[#888] mb-1.5">Split View</div>
-      <div className="text-2xl font-bold tracking-tight text-white mb-2">From Co-Pilot to Autopilot</div>
-      <p className="text-[13px] text-[#aaa] leading-[1.7] mb-6">
-        {items.length} steps across {stages.length} stages, totalling ~{totalHours} hours per deal. Here&rsquo;s how the work breaks down.
-      </p>
-
-      <div className="flex flex-col gap-5 mb-6">
-        {AI_LEVEL_ORDER.map(level => {
-          const c = counts[level]
-          const meta = colors[level]
-          const pct = Math.round((c.hours / totalHours) * 100)
-          return (
-            <div key={level} className="flex items-start gap-3">
-              <div className="w-1 shrink-0 rounded-full mt-1" style={{ height: Math.max(20, c.items * 1.5), background: meta.bg === '#2A2A2A' ? '#666' : meta.bg }} />
-              <div>
-                <div className="text-[11px] font-bold tracking-[1.5px] uppercase mb-0.5" style={{ color: meta.bg === '#2A2A2A' ? '#999' : meta.bg }}>
-                  {meta.label}
-                </div>
-                <div className="text-[10px] text-[#888] mb-1">
-                  {c.items} steps &middot; ~{c.hours}h &middot; {pct}% of time
-                </div>
-                <div className="text-[10px] text-[#666]">
-                  {c.stages.join(', ')}
-                </div>
+    <div className="flex flex-col gap-5">
+      {AI_LEVEL_ORDER.map(level => {
+        const c = counts[level]
+        const meta = colors[level]
+        const pct = Math.round((c.hours / totalHours) * 100)
+        return (
+          <div key={level} className="flex items-start gap-3">
+            <div className="w-1 shrink-0 rounded-full mt-1" style={{ height: Math.max(20, c.items * 1.5), background: meta.bg === '#2A2A2A' ? '#666' : meta.bg }} />
+            <div>
+              <div className="text-[11px] font-bold tracking-[1.5px] uppercase mb-0.5" style={{ color: meta.bg === '#2A2A2A' ? '#999' : meta.bg }}>
+                {meta.label}
+              </div>
+              <div className="text-[10px] text-[#888] mb-1">
+                {c.items} steps &middot; ~{c.hours}h &middot; {pct}% of time
+              </div>
+              <div className="text-[10px] text-[#666]">
+                {c.stages.join(', ')}
               </div>
             </div>
-          )
-        })}
-      </div>
-
-      <div className="pt-3 border-t border-white/[0.06]">
-        <p className="text-xs text-[#aaa] leading-[1.8]">
-          <strong className="text-[#ccc]">65% automated today.</strong> The agent spends 70% of their time on what matters — selling, consulting, building trust.
-        </p>
-        <p className="text-xs text-[#888] leading-[1.8] mt-1">
-          Target: <strong className="text-[#ccc]">90%+ automation.</strong> The last mile is what we&rsquo;re building.
-        </p>
-      </div>
-    </>
+          </div>
+        )
+      })}
+    </div>
   )
 }
