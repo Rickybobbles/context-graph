@@ -17,7 +17,7 @@ only when needed), **safe** (nothing spends money without a human tap), **low-ma
 ### MVP (Phase 1)
 | Capability | What it does |
 |---|---|
-| **Conversational PA** | Per-person WhatsApp chat with the assistant (shared brain behind every chat — see §2). Understands natural requests: "we're at Sarah's for dinner Saturday", "remind me to renew Remy's health insurance". |
+| **Conversational PA** | Telegram family group + per-person DMs with the assistant. Understands natural requests: "we're at Sarah's for dinner Saturday", "remind me to renew Remy's health insurance". |
 | **Shared calendar** | Reads/writes the family Google Calendar. Detects conflicts ("that clashes with Remy's swim class"), adds travel-time buffers. |
 | **Task list & jobs-to-be-done** | Extracts clear, atomic tasks from chat. Each task gets an owner, a due window, and optionally a *context trigger* (see below). |
 | **Context-aware task routing** | The clever bit: tasks are matched against calendar movements. "Buy milk" + "Rich has nursery pickup at 17:00 near the Migros" → agent pings Rich at 16:50 with the errand attached. No live GPS needed for v1 — the calendar *is* the location model. |
@@ -64,14 +64,13 @@ only when needed), **safe** (nothing spends money without a human tap), **low-ma
 ### Recommendation: thin TypeScript orchestrator + Claude API tool use
 
 ```
-WhatsApp (1:1 chat per family member,
-Meta Cloud API, dedicated number)
+Telegram (family group + per-person DMs)
         │  webhook
         ▼
 ┌─────────────────────────────────────────────┐
 │  Orchestrator (Node/TS, single small VPS)   │
 │                                             │
-│  1. Auth: WhatsApp number allowlist         │
+│  1. Auth: Telegram user-ID allowlist        │
 │  2. Router: Haiku classifies the request    │
 │  3. Dispatch:                               │
 │     • deterministic path (no LLM) — button  │
@@ -95,32 +94,25 @@ Meta Cloud API, dedicated number)
 **Why this shape:**
 
 - **Claude API + tool use (own loop)** rather than Managed Agents: you need per-request model
-  choice for cost routing, and your tools (calendar, DB, WhatsApp buttons) are all client-side
+  choice for cost routing, and your tools (calendar, DB, Telegram buttons) are all client-side
   anyway. Managed Agents shines when you want Anthropic to host a container workspace — not needed
   here, and it adds cost. The SDK's beta **tool runner** (`client.beta.messages.toolRunner` with
   `betaZodTool`) handles the agentic loop for you; drop to the manual loop only for the purchase
   flow where you want a human-approval gate between tool call and execution.
-- **WhatsApp (decided)** via Meta's Cloud API directly — no BSP middleman, no platform markup.
-  What this means in practice:
-  - **No family group chat.** Meta's native group support in the Cloud API is gated to businesses
-    with 100k+ monthly conversations. Instead: each family member gets a 1:1 chat with the
-    assistant, and the **shared brain** lives server-side — everyone talks to the same state
-    (tasks, calendar, lists), and the agent fans announcements out to each person individually.
-    Day-to-day this feels close to a group ("tell everyone dinner moved to 7") without being one.
-  - **Inbound is free.** Anything a family member sends opens a 24-hour service window in which
-    all replies are free and unlimited — the whole conversational side costs nothing.
-  - **Proactive pings cost a few cents.** Reminders outside a 24h window ("grab milk at 16:50",
-    "Krankenkasse due Friday") must be pre-approved **utility template** messages, billed per
-    delivered message (~CHF 0.03–0.05 in CH). At 5–10 nudges/day family-wide that's roughly
-    CHF 5–15/month. Mitigation: batch nudges, and prefer delivering into an already-open window.
-  - **Approval buttons work.** WhatsApp interactive reply buttons (up to 3) cover the
-    Approve/Edit/Cancel checkout gate, both in service windows and in templates.
-  - **Setup friction (one-time):** a Meta Business account + verification, a **dedicated phone
-    number** for the assistant (a cheap eSIM or virtual number — your personal numbers stay
-    untouched), and template approval for the reminder formats.
-  - Fallback if Meta setup proves too painful: Telegram has none of these constraints (free,
-    groups, buttons) at the cost of the family adopting another app. The orchestrator's chat
-    layer is a thin adapter either way, so switching later is cheap.
+- **Telegram (decided)** over WhatsApp and Slack:
+  - **WhatsApp was the first choice but the Business API fights this use case**: no group chat
+    for small accounts (Meta gates native groups to 100k+ monthly-conversation businesses),
+    per-message fees for proactive reminders (~CHF 0.03–0.05 each), pre-approved template
+    friction, a dedicated phone number, and Meta Business verification. All of that disappears
+    with Telegram.
+  - **Slack** was considered: good bots and buttons, but its free tier hides messages after
+    90 days and the whole product is shaped for workplaces, not families.
+  - **Telegram gives everything this agent needs for free**: a real family group chat *plus*
+    per-person DMs, unlimited proactive messages (reminders cost nothing, any time), inline
+    approval buttons for the checkout gate, file/PDF uploads for statement ingestion, and a
+    2-minute bot setup via @BotFather. The only cost is the family installing one more app.
+  - The chat layer stays a thin adapter regardless, so revisiting WhatsApp later (if Meta
+    loosens the group/pricing constraints) is cheap.
 - **One small VPS + SQLite** over serverless: the agent needs cron jobs, a persistent Playwright
   browser profile, and a long-lived event loop. A €4–5/mo Hetzner box (or Fly.io machine, or a
   Raspberry Pi at home for ~free) covers all of it. SQLite is plenty for one family; no managed
@@ -175,7 +167,7 @@ This is the core of the "cost effective" requirement. Three tiers plus a free ti
 - **Small context by design**: agent memory lives in SQLite/markdown files the model reads
   through tools on demand, not stuffed into every prompt.
 - **Per-tier daily budget caps** in the orchestrator (e.g. Opus hard-capped at $0.50/day)
-  with a WhatsApp warning when 80% consumed.
+  with a Telegram warning when 80% consumed.
 
 ### Estimated running cost
 
@@ -190,9 +182,7 @@ Assumptions: ~25 agent interactions/day across the family, avg 2.5 model calls p
 | Batch jobs (digest, scans) | ~$1 |
 | **Anthropic API total** | **~$10–20/mo** |
 | VPS (Hetzner CX22 or Fly.io) | ~$5/mo |
-| WhatsApp — inbound/service messages | $0 |
-| WhatsApp — proactive reminder templates | ~CHF 5–15 |
-| Google Calendar API, SQLite | $0 |
+| Telegram Bot API, Google Calendar API, SQLite | $0 |
 | **Total** | **~$15–25/mo** |
 
 Worst month with heavy use maybe $35. Cheaper than one takeaway pizza order it will inevitably
@@ -209,7 +199,7 @@ be asked to place.
 | `shopping_list_*` | SQLite | Running list with store affinity (Migros vs Galaxus vs anywhere). |
 | `bills_*` / `budget_query` | SQLite | Recurring bills register + transactions table, populated by statement ingestion. |
 | `statement_ingest` | Claude PDF support + Batch API | Family member drops a statement PDF in chat → transactions extracted, categorized, recurring bills detected/updated. |
-| `send_message` / `ask_approval` | WhatsApp Cloud API | `ask_approval` renders interactive reply buttons and **blocks** the flow until tapped — the human gate. Proactive sends outside a 24h window go as utility templates. |
+| `send_message` / `ask_approval` | Telegram Bot API | `ask_approval` renders inline buttons and **blocks** the flow until tapped — the human gate. Proactive sends are free, any time. |
 | `remember` / `recall` | Markdown memory files per family member + shared | Preferences ("Remy is dairy-free"), correction history. |
 | `web_search` | Anthropic server-side web search tool | Price comparison, product research. Server-side, no scraping infra. |
 | `migros_cart_build` / `galaxus_cart_build` | Playwright worker (Phase 3) | Always terminates before payment; checkout only fires from an `ask_approval` = yes. |
@@ -222,7 +212,7 @@ be asked to place.
 **Money is the headline risk; treat the purchase path as hostile-by-default.**
 
 1. **Human-in-the-loop on all spending.** Checkout is a deterministic code path that only
-   executes after a WhatsApp button tap from an allowlisted adult. The model can *propose*,
+   executes after a Telegram button tap from an allowlisted adult. The model can *propose*,
    never *pay*. Enforced in the orchestrator, not the prompt.
 2. **Hard limits in code**: per-order cap (e.g. CHF 200), monthly purchasing cap, merchant
    allowlist (Migros, Galaxus only). Exceeding = flat refusal + notification, no override
@@ -232,7 +222,7 @@ be asked to place.
    *trigger* tool calls with side effects; the orchestrator tags message provenance and the
    purchase/calendar-write tools reject turns whose trigger originated from ingested content
    without a fresh human confirmation.
-4. **Identity**: WhatsApp sender-number allowlist (webhook payloads are Meta-signed; verify the signature); kids (later) get a restricted role — no purchase
+4. **Identity**: Telegram user-ID allowlist (plus the bot's webhook secret token); kids (later) get a restricted role — no purchase
    approval rights, no budget visibility if desired.
 5. **Secrets**: API keys and the Playwright browser profile live on the VPS in env vars /
    an encrypted volume; never in the repo, never in prompts (prompts persist in logs).
@@ -255,20 +245,22 @@ be asked to place.
 
 | Phase | Scope | Effort (evenings) |
 |---|---|---|
-| **0. Skeleton** | Meta Business setup (number, verification, webhook) + VPS + SQLite + Anthropic SDK; echo agent with Haiku router and one tool (`task_create`). | 3–4 (Meta verification adds calendar wait time) |
+| **0. Skeleton** | VPS + Telegram bot (@BotFather, 2 minutes) + webhook + SQLite + Anthropic SDK; echo agent with Haiku router and one tool (`task_create`). | 2–3 |
 | **1. PA core** | Google Calendar tools, task CRUD, context-triggered reminders (calendar × tasks join), memory files, prompt caching, per-tier budget caps. | 5–8 |
 | **2. Money** | Bills register + reminder cron, statement-PDF ingestion pipeline, budget queries, weekly digest via Batch API. | 4–6 |
 | **3. Purchasing** | Shopping list → deep-link mode (decided launch scope); Playwright cart automation deferred until deep links feel limiting. | 3–5 |
 | **4. Backlog** | Meal planning, inbox ingestion, chores, document vault — pick by family demand. | ongoing |
 
-**Stack**: TypeScript, `@anthropic-ai/sdk` (tool runner + `betaZodTool`), WhatsApp Cloud API (plain webhooks + fetch — no SDK needed),
+**Stack**: TypeScript, `@anthropic-ai/sdk` (tool runner + `betaZodTool`), `grammy` (Telegram),
 `googleapis`, `better-sqlite3`, `node-cron`, `playwright`. One repo, one process (plus the
 isolated Playwright worker in Phase 3).
 
 ### Decisions (resolved)
-1. **Chat surface: WhatsApp** (Meta Cloud API, direct). 1:1 chats per family member with a
-   shared server-side brain; no group chat (API-gated); proactive reminders cost ~CHF 0.03–0.05
-   each as utility templates. Chat layer built as an adapter so Telegram remains a cheap fallback.
+1. **Chat surface: Telegram.** Family group + per-person DMs, free unlimited messaging and
+   proactive reminders, inline approval buttons, PDF uploads. (WhatsApp was ruled out: the
+   Business API blocks group chat for small accounts and charges per proactive message. Slack
+   ruled out: 90-day free-tier history, workplace-shaped.) Chat layer is a thin adapter, so
+   revisiting WhatsApp later is cheap.
 2. **Calendar: Google Calendar.** Shared family calendar as source of truth; agent is a client.
 3. **Purchasing: deep-link mode at launch.** Agent produces exact Migros/Galaxus product links +
    quantities; humans tap through. Browser automation deferred.
