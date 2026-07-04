@@ -61,7 +61,61 @@ only when needed), **safe** (nothing spends money without a human tap), **low-ma
 
 ## 2. Architecture
 
-### Recommendation: thin TypeScript orchestrator + Claude API tool use
+Two candidate shapes. **Path A (Hermes harness) is the preferred direction**, pending a
+weekend trial; **Path B (custom orchestrator) is the fallback** and is already scaffolded
+and working, so nothing is at risk while we evaluate.
+
+### Path A (preferred, pending trial): Hermes harness + family-tools MCP server
+
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) (Nous Research, MIT, self-hosted)
+provides the entire harness layer off the shelf: Telegram/WhatsApp/Signal gateways, persistent
+agent-curated memory with cross-session recall, a natural-language cron scheduler, MCP support,
+sandboxed execution with command approval/allowlists, and a very large active community.
+
+```
+Telegram gateway ──► Hermes Agent (Docker on the VPS)
+                        │  harness: chat, memory, cron,
+                        │  agent loop, skills
+                        ▼  MCP
+             ┌─────────────────────────────┐
+             │  family-tools MCP server    │   ← the code WE own
+             │  (Node/TS, same box)        │
+             │                             │
+             │  • tasks / shopping / bills │
+             │    (SQLite + audit log)     │
+             │  • Google Calendar tools    │
+             │  • statement ingestion      │
+             │  • Migros/Galaxus deep links│
+             │  • ask_approval + hard      │
+             │    spend caps (server-side) │
+             └─────────────────────────────┘
+```
+
+The split principle: **Hermes owns the plumbing, we own the domain and the money.**
+Everything safety-critical (spend caps, merchant allowlist, approval gates) lives in the MCP
+server's code, where the agent — including Hermes's self-authored skills — cannot rewrite it.
+
+**Known trade-offs to validate in the trial:**
+
+1. **No per-request tiered model routing.** Hermes runs one model at a time (`hermes model`
+   switches globally). Running Sonnet full-time costs roughly $15–30/mo at family volume —
+   more than the tiered design, still cheap. If Hermes later grows router support, we reclaim
+   the savings.
+2. **Multi-user family semantics unproven.** "DM pairing" suggests a single-owner design.
+   The trial must confirm: several family members talking to one agent, with per-person
+   identity reaching the MCP tools (for task ownership and purchase-approval roles).
+3. **Self-improving skills + money don't mix.** Mitigated by the split above; also disable
+   or review skill auto-authoring around purchase flows.
+4. **Fast-moving young project** — expect breaking changes; pin versions, update deliberately.
+
+**Trial (decision gate):** run Hermes in Docker with the Telegram gateway on Sonnet for a
+weekend; two family members use it for real. Pass = multi-user works, per-person identity is
+visible to tools, and it feels stable. Pass → Path A; fail → Path B, nothing lost.
+
+### Path B (fallback, already scaffolded): thin TypeScript orchestrator
+
+Phase 0 of this path is **built and smoke-tested** (`family-agent/` — Telegram bot, Haiku
+router with confidence gate, task tools, SQLite, audit log).
 
 ```
 Telegram (family group + per-person DMs)
@@ -123,6 +177,7 @@ Telegram (family group + per-person DMs)
 ### Alternatives considered
 | Option | Verdict |
 |---|---|
+| Hermes Agent harness | **Promoted to Path A** (see above), pending the multi-user trial. |
 | Managed Agents (Anthropic-hosted sessions) | Clean, but per-session containers + always-Opus-class defaults work against the cost goal. Revisit if the orchestrator grows painful. |
 | Claude Agent SDK / Claude Code as runtime | Great for dev-tool agents; overweight for a chat PA with a fixed toolset. |
 | n8n / Home Assistant + LLM nodes | Fast to prototype, but the routing/confidence logic and approval flows get awkward in visual builders. Fine as a fallback. |
@@ -131,6 +186,12 @@ Telegram (family group + per-person DMs)
 ---
 
 ## 3. Model routing & cost control
+
+> **Path note:** the tiered routing below is fully realized in **Path B** (it's what the
+> scaffold implements). Under **Path A**, Hermes runs a single model (Sonnet recommended,
+> ~$15–30/mo at family volume) and the router tiers don't apply — the remaining cost levers
+> there are prompt caching (Hermes-managed), doing digests/statement ingestion through the
+> MCP server on the Batch API, and revisiting routing if Hermes grows multi-model support.
 
 This is the core of the "cost effective" requirement. Three tiers plus a free tier:
 
@@ -183,14 +244,19 @@ Assumptions: ~25 agent interactions/day across the family, avg 2.5 model calls p
 | **Anthropic API total** | **~$10–20/mo** |
 | VPS (Hetzner CX22 or Fly.io) | ~$5/mo |
 | Telegram Bot API, Google Calendar API, SQLite | $0 |
-| **Total** | **~$15–25/mo** |
+| **Total** | **~$15–25/mo (Path B, tiered)** |
 
-Worst month with heavy use maybe $35. Cheaper than one takeaway pizza order it will inevitably
+Under **Path A** (Hermes on Sonnet full-time) the API line rises to roughly $15–30/mo;
+total ~$20–35/mo. Worst month with heavy use maybe $35–45. Cheaper than one takeaway pizza order it will inevitably
 be asked to place.
 
 ---
 
 ## 4. Tools & integrations
+
+The same toolset serves both paths: under Path A these are exposed via the **family-tools
+MCP server**; under Path B they're registered directly on the SDK tool runner. The SQLite
+data model, audit log, and approval/spend-cap code are identical either way.
 
 | Tool (exposed to the model) | Backed by | Notes |
 |---|---|---|
@@ -238,6 +304,11 @@ be asked to place.
    (medical, etc.) in memory files the model only reads on demand.
 9. **Blast-radius separation**: the Playwright worker runs as a separate OS user/container
    from the orchestrator; a compromised browser session can't read the API keys.
+10. **Hermes-specific (Path A)**: money-touching logic lives only in the MCP server, outside
+    the agent's self-editable skills; Hermes runs in Docker with its sandbox on and a command
+    allowlist; skill auto-authoring reviewed (or disabled) once purchase tools are attached;
+    versions pinned and upgraded deliberately, reading release notes — it's a young,
+    fast-moving project.
 
 ---
 
@@ -245,17 +316,23 @@ be asked to place.
 
 | Phase | Scope | Effort (evenings) |
 |---|---|---|
-| **0. Skeleton** | VPS + Telegram bot (@BotFather, 2 minutes) + webhook + SQLite + Anthropic SDK; echo agent with Haiku router and one tool (`task_create`). | 2–3 |
-| **1. PA core** | Google Calendar tools, task CRUD, context-triggered reminders (calendar × tasks join), memory files, prompt caching, per-tier budget caps. | 5–8 |
-| **2. Money** | Bills register + reminder cron, statement-PDF ingestion pipeline, budget queries, weekly digest via Batch API. | 4–6 |
-| **3. Purchasing** | Shopping list → deep-link mode (decided launch scope); Playwright cart automation deferred until deep links feel limiting. | 3–5 |
-| **4. Backlog** | Meal planning, inbox ingestion, chores, document vault — pick by family demand. | ongoing |
+| **0a. Hermes trial (decision gate)** | Docker + Hermes + Telegram gateway on Sonnet; two family members use it over a weekend. Verify multi-user identity, stability, and that per-person identity can reach MCP tools. Pass → Path A; fail → Path B. | 1 + a weekend of casual use |
+| **0b. Skeleton** | *Path A*: port the scaffold's task tools + SQLite into the family-tools MCP server, attach to Hermes. *Path B*: already built (`family-agent/` — bot, router, task tools). | A: 2–3 · B: 0 (done) |
+| **1. PA core** | Google Calendar tools, context-triggered reminders (calendar × tasks join). *Path A*: reminders via Hermes NL cron calling MCP; memory is Hermes-native. *Path B*: node-cron + memory files + per-tier budget caps. | 4–7 |
+| **2. Money** | Bills register + reminder cron, statement-PDF ingestion pipeline, budget queries, weekly digest via Batch API (in the MCP server on both paths). | 4–6 |
+| **3. Purchasing** | Shopping list → deep-link mode (decided launch scope); `ask_approval` + hard spend caps server-side; Playwright cart automation deferred. | 3–5 |
+| **4. Backlog** | Meal planning, inbox ingestion, chores, document vault — pick by family demand. *Path A bonus*: many of these become Hermes skills rather than code. | ongoing |
 
-**Stack**: TypeScript, `@anthropic-ai/sdk` (tool runner + `betaZodTool`), `grammy` (Telegram),
-`googleapis`, `better-sqlite3`, `node-cron`, `playwright`. One repo, one process (plus the
-isolated Playwright worker in Phase 3).
+**Stack**: TypeScript, `better-sqlite3`, `googleapis`, `@anthropic-ai/sdk`, `playwright`
+(Phase 3). *Path A adds*: Hermes Agent (Docker) + an MCP server package (`@modelcontextprotocol/sdk`).
+*Path B adds*: `grammy` (Telegram) + `node-cron` + the SDK tool runner (`betaZodTool`).
 
-### Decisions (resolved)
+### Decisions
+0. **Harness: pending the Hermes trial (Phase 0a).** Preferred: Hermes Agent as harness with
+   our family-tools MCP server. Fallback: the already-built custom orchestrator. The domain
+   code (tools, SQLite, money gates) is shared between both, so the trial risks nothing.
+
+Resolved:
 1. **Chat surface: Telegram.** Family group + per-person DMs, free unlimited messaging and
    proactive reminders, inline approval buttons, PDF uploads. (WhatsApp was ruled out: the
    Business API blocks group chat for small accounts and charges per proactive message. Slack
